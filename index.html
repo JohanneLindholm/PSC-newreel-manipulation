@@ -1,0 +1,931 @@
+<!-- PSC Study 2 newsfeed prototype. Source card text:
+     data/scale_survey_final_card_wordings_source_of_truth.csv -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>World Outlook Newsreel</title>
+<style>
+  :root{
+    color-scheme:light;
+    --bg:#e9ecef;
+    --paper:#fffdf8;
+    --ink:#151515;
+    --muted:#697078;
+    --line:#d2d6da;
+    --rule:#111;
+    --accent:#b6252a;
+    --blue:#203a57;
+    --shadow:0 22px 52px rgba(22,27,33,.16);
+    --radius:8px;
+    --peek:72px;
+    --card-gap:10px;
+    --reel-height:640px;
+  }
+
+  *{box-sizing:border-box}
+  html,body{min-height:100%}
+  body{
+    min-height:100dvh;
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font:18px/1.5 Georgia, "Times New Roman", serif;
+    overflow:hidden;
+  }
+
+  .shell{
+    width:min(980px, calc(100vw - 24px));
+    height:100dvh;
+    min-height:520px;
+    margin:0 auto;
+    padding:clamp(8px, 1.7vh, 18px) 0 clamp(10px, 2vh, 20px);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .newsroom{
+    flex:1;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    border:1px solid #c8cdd2;
+    border-radius:10px;
+    background:var(--paper);
+    box-shadow:var(--shadow);
+  }
+
+  .topline{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    padding:10px 18px 8px;
+    border-bottom:4px solid var(--rule);
+    font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  .brand{
+    margin:0;
+    font-size:clamp(24px, 4vw, 42px);
+    line-height:.95;
+    font-weight:900;
+    letter-spacing:-.01em;
+    text-transform:uppercase;
+  }
+
+  .edition{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:2px;
+    color:#30353a;
+    font-size:12px;
+    font-weight:750;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+
+  .meta{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:18px;
+    min-height:34px;
+    padding:0 18px;
+    border-bottom:1px solid var(--line);
+    color:#343a40;
+    background:#f6f7f4;
+    font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+    font-size:12px;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+
+  .ticker{
+    min-width:0;
+    overflow:hidden;
+    white-space:nowrap;
+  }
+
+  .ticker span{
+    display:inline-block;
+    padding-right:40px;
+  }
+
+  .progress{
+    flex:0 0 128px;
+    height:5px;
+    border-radius:999px;
+    overflow:hidden;
+    background:#dfe3e7;
+  }
+
+  .bar{
+    width:0%;
+    height:100%;
+    background:var(--accent);
+    transition:width .25s linear;
+  }
+
+  .viewport{
+    flex:1;
+    position:relative;
+    min-height:0;
+    overflow:hidden;
+    background:var(--paper);
+  }
+
+  .viewport::before,
+  .viewport::after{
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    height:var(--peek);
+    pointer-events:none;
+    z-index:5;
+    backdrop-filter:blur(5px);
+    -webkit-backdrop-filter:blur(5px);
+  }
+
+  .viewport::before{
+    top:0;
+    background:linear-gradient(to bottom, rgba(255,253,248,.68), rgba(255,253,248,.24) 64%, rgba(255,253,248,0));
+  }
+
+  .viewport::after{
+    bottom:0;
+    background:linear-gradient(to top, rgba(255,253,248,.68), rgba(255,253,248,.24) 64%, rgba(255,253,248,0));
+  }
+
+  .feed{
+    padding:var(--peek) 0;
+    will-change:transform;
+    transform:translateY(0);
+  }
+
+  .card{
+    --fit:1;
+    --rail:calc(112px * var(--fit));
+    height:max(300px, calc(var(--reel-height) - (var(--peek) * 2) - var(--card-gap)));
+    margin:0 24px var(--card-gap);
+    display:grid;
+    grid-template-columns:var(--rail) minmax(0,1fr);
+    gap:calc(24px * var(--fit));
+    align-items:stretch;
+    overflow:hidden;
+    padding:calc(clamp(18px, 3.2vh, 28px) * var(--fit)) calc(clamp(20px, 3.2vw, 32px) * var(--fit));
+    border:1px solid var(--line);
+    border-radius:7px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(90deg, #f4f5f1 0 var(--rail), var(--paper) var(--rail));
+    box-shadow:0 7px 16px rgba(20,24,29,.06);
+    filter:blur(3px);
+    opacity:.58;
+    transform:scale(.985);
+    transform-origin:center;
+    transition:filter 220ms ease, opacity 220ms ease, transform 220ms ease;
+  }
+
+  .card.is-current{
+    filter:none;
+    opacity:1;
+    transform:none;
+  }
+
+  .edge-preview{
+    position:absolute;
+    left:clamp(24px, 3vw, 44px);
+    right:clamp(24px, 3vw, 44px);
+    height:var(--peek);
+    display:flex;
+    align-items:center;
+    overflow:hidden;
+    pointer-events:none;
+    z-index:4;
+    color:rgba(21,21,21,.68);
+    filter:blur(3.2px);
+    opacity:.72;
+    transform:translateZ(0);
+  }
+
+  .edge-preview.is-empty{display:none}
+
+  .edge-preview.top{top:0}
+  .edge-preview.bottom{bottom:0}
+
+  .edge-preview-inner{
+    width:100%;
+    padding:0 clamp(24px, 15vw, 174px);
+  }
+
+  .edge-kicker{
+    margin:0 0 4px;
+    color:var(--accent);
+    font:900 10px/1 system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+
+  .edge-text{
+    margin:0;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    overflow:hidden;
+    font:800 clamp(18px, min(2.3vw, 3vh), 26px)/1.08 system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  .card-top{
+    align-self:stretch;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:space-between;
+    gap:calc(14px * var(--fit));
+    padding:4px 0;
+    border-right:1px solid var(--line);
+    font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  .domain{
+    writing-mode:vertical-rl;
+    transform:rotate(180deg);
+    font-size:calc(13px * var(--fit));
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--blue);
+  }
+
+  .dateline{
+    max-width:80px;
+    color:var(--muted);
+    font-size:calc(10px * var(--fit));
+    font-weight:800;
+    letter-spacing:.06em;
+    line-height:1.25;
+    text-align:center;
+    text-transform:uppercase;
+  }
+
+  .story{
+    align-self:center;
+    padding-right:10px;
+    min-width:0;
+  }
+
+  .wire-label{
+    display:flex;
+    align-items:center;
+    gap:calc(9px * var(--fit));
+    margin-bottom:calc(14px * var(--fit));
+    color:var(--accent);
+    font:900 calc(11px * var(--fit))/1 system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+
+  .wire-label::after{
+    content:"";
+    height:1px;
+    flex:1;
+    background:#cfd4d9;
+  }
+
+  .headline{
+    margin:0 0 calc(14px * var(--fit));
+    max-width:24ch;
+    font:900 calc(clamp(27px, min(3.6vw, 5.2vh), 43px) * var(--fit))/.99 system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+    letter-spacing:0;
+  }
+
+  .body{
+    max-width:68ch;
+    margin:0;
+    font-size:calc(clamp(14px, min(1.55vw, 2.05vh), 18px) * var(--fit));
+    line-height:1.42;
+  }
+
+  .card-id{
+    display:flex;
+    align-items:center;
+    gap:calc(9px * var(--fit));
+    margin-top:calc(18px * var(--fit));
+    color:#59616a;
+    font:700 calc(11px * var(--fit))/1.2 system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+
+  .card-id::before{
+    content:"";
+    width:34px;
+    height:2px;
+    background:#c8cdd2;
+  }
+
+  .preview-panel{
+    display:none;
+    grid-template-columns:1fr auto auto;
+    gap:8px;
+    align-items:center;
+    padding:10px;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    background:#fff;
+    font:14px/1.2 system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  .preview .preview-panel{display:grid}
+  select,input,button{
+    min-height:34px;
+    border:1px solid #c8cec1;
+    border-radius:6px;
+    background:#fff;
+    color:var(--ink);
+    font:inherit;
+  }
+  select,input{padding:0 9px}
+  button{padding:0 12px;font-weight:700;cursor:pointer}
+
+  .done{
+    position:absolute;
+    inset:0;
+    display:none;
+    place-items:center;
+    padding:28px;
+    background:var(--paper);
+    text-align:center;
+    font:700 22px/1.25 system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  .is-complete .done{display:grid}
+
+  @media (max-width:640px){
+    :root{--peek:50px;--card-gap:8px}
+    body{font-size:17px}
+    .shell{width:100%;min-height:500px;padding:8px}
+    .topline{padding:10px 12px 8px}
+    .brand{font-size:24px}
+    .edition{font-size:10px}
+    .meta{font-size:11px}
+    .progress{width:76px}
+    .card{
+      --rail:auto;
+      height:max(340px, calc(var(--reel-height) - (var(--peek) * 2) - var(--card-gap)));
+      margin:0 10px var(--card-gap);
+      display:flex;
+      flex-direction:column;
+      gap:calc(14px * var(--fit));
+      padding:calc(18px * var(--fit)) calc(16px * var(--fit));
+      background:var(--paper);
+    }
+    .card-top{
+      flex-direction:row;
+      justify-content:flex-start;
+      align-self:stretch;
+      border-right:0;
+      border-bottom:1px solid var(--line);
+      padding:0 0 calc(10px * var(--fit));
+    }
+    .domain{
+      writing-mode:horizontal-tb;
+      transform:none;
+      font-size:calc(11px * var(--fit));
+    }
+    .dateline{display:none}
+    .story{align-self:stretch;padding-right:0}
+    .headline{
+      max-width:none;
+      font-size:calc(clamp(23px, min(7vw, 4.7vh), 31px) * var(--fit));
+    }
+    .body{font-size:calc(clamp(13px, 2vh, 16px) * var(--fit))}
+    .edge-preview{
+      left:12px;
+      right:12px;
+    }
+    .edge-preview-inner{padding:0 16px}
+    .edge-text{font-size:clamp(15px, 4.2vw, 19px)}
+    .preview-panel{grid-template-columns:1fr 1fr}
+    .preview-panel button{grid-column:1 / -1}
+  }
+
+  @media (max-height:680px){
+    :root{--peek:46px;--card-gap:8px}
+    .shell{min-height:460px}
+    .topline{padding:8px 14px 6px}
+    .brand{font-size:clamp(22px, 5vh, 34px)}
+    .edition{font-size:10px}
+    .meta{min-height:28px;font-size:10px}
+    .card{
+      height:max(285px, calc(var(--reel-height) - (var(--peek) * 2) - var(--card-gap)));
+    }
+    .wire-label{margin-bottom:12px;font-size:11px}
+    .headline{margin-bottom:12px}
+    .card-id{margin-top:16px}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .feed{transition:none!important}
+    .bar{transition:none}
+  }
+</style>
+</head>
+<body>
+<main class="shell" id="app">
+  <div class="preview-panel" aria-label="Preview controls">
+    <select id="feedSelect" aria-label="Feed condition"></select>
+    <input id="dwellInput" type="number" min="5" max="90" step="1" aria-label="Dwell seconds" />
+    <button id="restartButton" type="button">Restart</button>
+  </div>
+
+  <section class="newsroom" aria-label="World Outlook newsreel">
+    <header class="topline">
+      <h1 class="brand">World Outlook</h1>
+      <div class="edition">
+        <span>2030 Briefing</span>
+        <span>Updated 08:42</span>
+      </div>
+    </header>
+
+    <div class="meta" aria-live="polite">
+      <div class="ticker">
+        <span>Future desk</span>
+        <span>Forecast monitor</span>
+        <span id="articleCount">Article 1 of 8</span>
+      </div>
+      <span class="progress" aria-hidden="true"><span class="bar" id="progressBar"></span></span>
+    </div>
+
+    <section class="viewport" id="viewport" aria-label="Scrolling future newsfeed">
+      <div class="feed" id="feed"></div>
+      <div class="edge-preview top is-empty" id="topPreview" aria-hidden="true"></div>
+      <div class="edge-preview bottom is-empty" id="bottomPreview" aria-hidden="true"></div>
+      <div class="done" id="done">The newsfeed is complete.</div>
+    </section>
+  </section>
+</main>
+
+<script>
+  const CARDS = {
+    AI1P:{card_id:"AI1P",domain:"AI",polarity:"positive",subtopic:"1",headline:"Hospitals compete on in-person clinician access.",body:"Health-system analysts tracking hospital AI adoption observe pilot hospitals shifting staff time from paperwork to patient contact. Hospitals that turn those hours into quick nurse and doctor callbacks are expected to win patient ratings and insurer contracts, pushing rivals to match them. Models project a 25–35% increase in same-day in-person contact with a clinician for non-urgent concerns by 2030. For patients, that means less waiting alone with results and easier access to someone who can explain next steps."},
+    AI1N:{card_id:"AI1N",domain:"AI",polarity:"negative",subtopic:"1",headline:"Hospitals route more routine care through screens.",body:"Health-policy analysts expect hospital networks to expand AI triage, remote monitoring, and video follow-up for non-urgent care by 2030. Lower-risk symptoms are expected to move into standardized digital pathways, with care teams managing a much larger patient load than today. Models estimate that 50–60% of routine visits will be handled without direct nurse or doctor contact. Higher rates of anxiety and isolation are expected as patients cannot reach a nurse or doctor to clarify results or talk through concerns."},
+    AI2P:{card_id:"AI2P",domain:"AI",polarity:"positive",subtopic:"2",headline:"AI alerts help schools respond earlier to student problems.",body:"Education analysts expect that by 2030, many schools will use AI tools to flag early signs that a student may be struggling, such as drops in attendance, focus, or assignment quality. This lets teachers check in earlier and adjust support before problems grow. Pilot districts report steadier attendance and more consistent class participation with early-alert systems. Models forecast 25–35% fewer stress-related absences and stronger day-to-day engagement at school."},
+    AI2N:{card_id:"AI2N",domain:"AI",polarity:"negative",subtopic:"2",headline:"AI-led teaching cuts teacher contact and worsens student mental health.",body:"Education researchers expect cost and staffing pressures to push more schools toward AI-led instruction by 2030. As daily human support thins out, higher stress levels and more mental health related disruptions to learning are expected across school systems. Less unstructured peer time, fewer teacher check-ins, and weaker school relationships are driving a broader deterioration in youth wellbeing. Models project loneliness, depression, and anxiety among students will rise 30–35% by 2030."},
+    CL1P:{card_id:"CL1P",domain:"Climate",polarity:"positive",subtopic:"1",headline:"Compact agritech enable large-scale rewilding and nature recovery.",body:"Food system analysts expect that by 2030, indoor farms and closed-loop greenhouses will cut global cropland use by 40%. As more food is grown in vertical buildings, models project large areas of rural land freed for nature and forest regrowth, with more green space, cleaner streams, and cooler habitats. The restored carbon sinks are projected to put global emissions on a climate-stabilizing path."},
+    CL1N:{card_id:"CL1N",domain:"Climate",polarity:"negative",subtopic:"1",headline:"Hotter, drier conditions push the world across climate tipping points.",body:"Climate scientists predict that continued fossil fuel use and rising energy demand will raise global temperatures and increase atmospheric dryness. By 2030, models project 30–50% longer fire seasons on average. Persistent heat waves are expected to accelerate forest loss and degrade local watersheds. As these pressures build, communities worldwide should expect more smoke days and poorer air quality in everyday life."},
+    CL2P:{card_id:"CL2P",domain:"Climate",polarity:"positive",subtopic:"2",headline:"New nuclear enables steady energy and water in hot regions.",body:"Energy analysts expect that by 2030, small modular and Gen III+ reactors will begin supplying stable power across major grids. These compact designs are cheaper to build and safer to operate than older nuclear plants. Early pilot projects suggest Gen III+ reactors will be able to power desalination systems at competitive cost. Forecasts estimate a 40% rise in safe water supply, improving conditions in water-stressed zones."},
+    CL2N:{card_id:"CL2N",domain:"Climate",polarity:"negative",subtopic:"2",headline:"Water shortages spark violence and mass displacement.",body:"Security analysts expect that by 2030, prolonged droughts and over-pumping will strain water systems across dry regions. Water scarcity is projected to increase reports of local conflicts over wells, especially in areas with existing shortages. Models estimate 20–35 million people displaced across drought belts from the U.S. Southwest to parts of North Africa and South Asia. Analysts note rising health risks and pressure on infrastructure as water supplies decline."},
+    EC1P:{card_id:"EC1P",domain:"Economy",polarity:"positive",subtopic:"1",headline:"AI logistics tools and backup suppliers help households save more.",body:"Trade economists expect more food and shipping firms to use AI tools and backup suppliers by 2030. These systems can help reroute delayed shipments and reduce spoilage, shortages, and rush delivery surcharges. With fewer price spikes for essentials, monthly household bills may become easier to predict. Models project that 10–15% more US households will build an emergency savings cushion."},
+    EC1N:{card_id:"EC1N",domain:"Economy",polarity:"negative",subtopic:"1",headline:"Dollar crash triggers a deep downturn.",body:"Economists predict that global investors will buy fewer U.S. bonds, making it costlier for the U.S. to borrow money. As borrowing costs rise, businesses are projected to scale back investments. A weaker dollar is also expected to raise prices on fuel and everyday goods, reducing what households can afford to spend. Economists forecast that, after inflation, average household incomes will be 10–15 % lower than today’s levels by 2030."},
+    EC2P:{card_id:"EC2P",domain:"Economy",polarity:"positive",subtopic:"2",headline:"Competition for workers strengthens middle-class pay and job security.",body:"Labor-market analysts expect cheaper automation to reduce routine costs while raising demand for mid-wage work built around repair, coordination, care, and on-site support. Official projections already show strong growth in healthcare support jobs, with similar labor shortages expected across construction, customer service, and local coordination. As retirements outpace workforce entry, employers are expected to compete harder to recruit and keep experienced workers. Models project that by 2030 mid-wage workers will be 10-15% less likely to face sudden cuts in hours, pay, or benefits."},
+    EC2N:{card_id:"EC2N",domain:"Economy",polarity:"negative",subtopic:"2",headline:"AI & consolidation push middle-class families into poverty.",body:"Labour market experts predict that new AI tools, software bots, and big company mergers will eliminate 8-12 million mid-wage office and service jobs by 2030. Public support and retraining efforts are expected to fall short. Models project a broad hit to middle-class stability. Most middle-class homes would face tighter budgets and smaller savings, with brief periods of poverty becoming a common part of life for many households each year."},
+    SF1P:{card_id:"SF1P",domain:"Public Safety",polarity:"positive",subtopic:"1",headline:"Crisis teams and street upgrades improve night-time safety.",body:"City analysts expect many US cities to expand crisis teams, improve street lighting, and keep public areas in good repair by 2030. Pilot programmes already show fewer emergency calls when trained civilian teams respond to non-violent incidents. Better lighting and cleaner streets are also linked to lower assault rates nearby. Models project that 25–35% more residents in those neighbourhoods will report feeling safe walking after dark."},
+    SF1N:{card_id:"SF1N",domain:"Public Safety",polarity:"negative",subtopic:"1",headline:"Repeated unrest raises assault risk in affected neighborhoods.",body:"Public-safety analysts expect that by 2030 some US cities will see repeated clashes around demonstrations and local disputes. When unrest recurs, police and emergency services can be stretched, making nearby violence harder to contain quickly. Models project 25–35% more serious assaults in the most affected areas. Residents may face cancelled events and feel less safe in daily life."},
+    SF2P:{card_id:"SF2P",domain:"Public Safety",polarity:"positive",subtopic:"2",headline:"Faster warning systems improve public safety",body:"Security analysts expect that by 2030, more warning systems will use the same detection standards, allowing verified alerts to move across borders faster than they do today. That gives local police, transit agencies, and emergency officials more time to act when the same serious risk appears in several places at once. Models project 15–20% fewer serious incidents affecting airports, transit hubs, and city centers. For residents, that is expected to make public places feel safer."},
+    SF2N:{card_id:"SF2N",domain:"Public Safety",polarity:"negative",subtopic:"2",headline:"Networked drone attacks raise the risk at home.",body:"Military analysts expect cheap autonomous drones, encrypted messaging, and online crowdfunding to spread to small extremist groups by 2030. Models project 40–60% more domestic attacks, causing more lockdown alerts and closures of public buildings in major cities. Experts warn that as many small groups replace a few large ones, terrorist threats become harder to predict and to stop."}
+  };
+
+  const FEEDS = {
+    POS_LOW_PSC:["AI1P","AI2P","CL1P","CL2P","EC1P","EC2P","SF1P","SF2P"],
+    NEG_LOW_PSC:["AI1N","AI2N","CL1N","CL2N","EC1N","EC2N","SF1N","SF2N"],
+    MIXED_INCONGRUENT_HIGH_PSC:["AI2P","AI2N","CL1P","CL1N","EC1P","EC1N","SF2P","SF2N"],
+    MIXED_CONGRUENT_LOW_PSC:["AI1P","AI2P","CL1N","CL2P","EC1N","EC2P","SF1N","SF2N"]
+  };
+
+  const params = new URLSearchParams(location.search);
+  const ASSIGN_URL = params.get("assign_url") || "https://DecisionLab.eu.pythonanywhere.com/assign-newsreel-condition";
+  const SAVE_URL = params.get("save_url") || "https://DecisionLab.eu.pythonanywhere.com/save-EFT";
+  const SEND = params.get("send") !== "0";
+  const DEBUG_SAVE = params.get("debug") === "1";
+  const participantId = params.get("participant_id") || params.get("PROLIFIC_PID") || params.get("ResponseID") || `guest_${Date.now()}`;
+  const study = params.get("study") || "psc_newsreel_pretest";
+  const preview = params.get("preview") === "1";
+  const requestedFeed = normalizeFeedName(params.get("feed"));
+  let dwellMs = clampNumber(Number(params.get("dwell")) || 35000, 5000, 90000);
+  let transitionMs = clampNumber(Number(params.get("transition")) || 1500, 0, 5000);
+  let condition = requestedFeed || "MIXED_INCONGRUENT_HIGH_PSC";
+  let currentIndex = 0;
+  let timerId = null;
+  let cardStartedAt = 0;
+  let exposureLog = [];
+  let focusLostAt = null;
+  let offscreenMs = 0;
+  let resizeFrame = null;
+  let assignment = null;
+
+  const app = document.getElementById("app");
+  const viewport = document.getElementById("viewport");
+  const feed = document.getElementById("feed");
+  const done = document.getElementById("done");
+  const topPreview = document.getElementById("topPreview");
+  const bottomPreview = document.getElementById("bottomPreview");
+  const count = document.getElementById("articleCount");
+  const progressBar = document.getElementById("progressBar");
+  const feedSelect = document.getElementById("feedSelect");
+  const dwellInput = document.getElementById("dwellInput");
+  const restartButton = document.getElementById("restartButton");
+
+  if(preview) app.classList.add("preview");
+  setupResponsiveLayout();
+  setupFocusLogging();
+  initialize();
+
+  async function initialize(){
+    await resolveCondition();
+    setupPreviewControls();
+    renderFeed();
+    startFeed();
+    if(document.fonts && document.fonts.ready){
+      document.fonts.ready.then(() => {
+        syncReelHeight();
+        fitCardsToViewport();
+        jumpToCurrentCard();
+      });
+    }
+  }
+
+  async function resolveCondition(){
+    if(preview || requestedFeed){
+      condition = requestedFeed || condition;
+      assignment = {condition, existing:false, source:preview ? "preview" : "url"};
+      return;
+    }
+
+    count.textContent = "Assigning feed";
+    try{
+      const res = await fetch(ASSIGN_URL, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          participant_id:participantId,
+          study,
+          page_url:location.href,
+          user_agent:navigator.userAgent,
+          viewport_width:window.innerWidth,
+          viewport_height:window.innerHeight
+        })
+      });
+      const data = await res.json();
+      if(!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      const assigned = normalizeFeedName(data.condition);
+      if(!assigned) throw new Error(`Unknown assigned condition: ${data.condition}`);
+      condition = assigned;
+      assignment = {...data, source:"backend"};
+    }catch(err){
+      count.textContent = "Feed assignment failed";
+      done.textContent = "The newsfeed could not be assigned. Please return to the survey and try again.";
+      viewport.classList.add("is-complete");
+      console.error("[NEWSREEL] assignment failed", err);
+      throw err;
+    }
+  }
+
+  function setupPreviewControls(){
+    Object.keys(FEEDS).forEach(name => {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name.replaceAll("_", " ");
+      feedSelect.appendChild(option);
+    });
+    feedSelect.value = condition;
+    dwellInput.value = String(Math.round(dwellMs / 1000));
+    feedSelect.addEventListener("change", () => {
+      condition = feedSelect.value;
+      restart();
+    });
+    dwellInput.addEventListener("change", () => {
+      dwellMs = clampNumber(Number(dwellInput.value) * 1000, 5000, 90000);
+      dwellInput.value = String(Math.round(dwellMs / 1000));
+      restart();
+    });
+    restartButton.addEventListener("click", restart);
+  }
+
+  function renderFeed(){
+    feed.replaceChildren();
+    done.parentElement.classList.remove("is-complete");
+    FEEDS[condition].map(id => CARDS[id]).forEach(card => feed.appendChild(createCard(card)));
+    syncReelHeight();
+    fitCardsToViewport();
+  }
+
+  function createCard(card){
+    const article = document.createElement("article");
+    article.className = "card";
+    article.dataset.cardId = card.card_id;
+    article.dataset.domain = card.domain;
+
+    const top = document.createElement("div");
+    top.className = "card-top";
+    const domain = document.createElement("span");
+    domain.className = "domain";
+    domain.textContent = card.domain;
+    const dateline = document.createElement("span");
+    dateline.className = "dateline";
+    dateline.textContent = "Outlook 2030";
+    top.append(domain, dateline);
+
+    const story = document.createElement("div");
+    story.className = "story";
+
+    const label = document.createElement("div");
+    label.className = "wire-label";
+    label.textContent = "Forecast wire";
+
+    const headline = document.createElement("h2");
+    headline.className = "headline";
+    headline.textContent = card.headline;
+
+    const body = document.createElement("p");
+    body.className = "body";
+    body.textContent = card.body;
+
+    const cardId = document.createElement("div");
+    cardId.className = "card-id";
+    cardId.textContent = card.card_id;
+
+    story.append(label, headline, body, cardId);
+    article.append(top, story);
+    return article;
+  }
+
+  function startFeed(){
+    clearTimeout(timerId);
+    currentIndex = 0;
+    exposureLog = [];
+    offscreenMs = 0;
+    focusLostAt = document.hidden ? performance.now() : null;
+    syncReelHeight();
+    fitCardsToViewport();
+    updateCardFocus();
+    updateEdgePreviews();
+    jumpToCurrentCard();
+    updateMeta();
+    cardStartedAt = performance.now();
+    progressBar.style.width = "0%";
+    timerId = setTimeout(advance, dwellMs);
+    requestAnimationFrame(() => { progressBar.style.width = progressWidth(); });
+    sendEvent("newsreel_auto_start");
+  }
+
+  function advance(){
+    logCurrentCard();
+    if(currentIndex >= FEEDS[condition].length - 1){
+      completeFeed();
+      return;
+    }
+    currentIndex += 1;
+    updateMeta();
+    updateCardFocus();
+    updateEdgePreviews();
+    const shift = positionForIndex(currentIndex);
+    feed.style.transition = `transform ${transitionMs}ms cubic-bezier(.38, 0, .18, 1)`;
+    feed.style.transform = `translateY(-${shift}px)`;
+    progressBar.style.width = progressWidth();
+    cardStartedAt = performance.now() + transitionMs;
+    timerId = setTimeout(advance, dwellMs + transitionMs);
+  }
+
+  function positionForIndex(index){
+    const card = feed.children[index];
+    if(!card) return 0;
+    const peek = parseFloat(getComputedStyle(feed).paddingTop) || 0;
+    return Math.max(0, card.offsetTop - peek);
+  }
+
+  function jumpToCurrentCard(){
+    feed.style.transition = "none";
+    feed.style.transform = `translateY(${-positionForIndex(currentIndex)}px)`;
+  }
+
+  function updateCardFocus(){
+    Array.from(feed.children).forEach((card, index) => {
+      card.classList.toggle("is-current", index === currentIndex);
+    });
+  }
+
+  function updateEdgePreviews(){
+    renderEdgePreview(topPreview, currentIndex - 1, "Previous article");
+    renderEdgePreview(bottomPreview, currentIndex + 1, "Next article");
+  }
+
+  function renderEdgePreview(target, index, label){
+    const id = FEEDS[condition][index];
+    target.replaceChildren();
+    target.classList.toggle("is-empty", !id);
+    if(!id) return;
+
+    const card = CARDS[id];
+    const inner = document.createElement("div");
+    inner.className = "edge-preview-inner";
+
+    const kicker = document.createElement("p");
+    kicker.className = "edge-kicker";
+    kicker.textContent = label;
+
+    const text = document.createElement("p");
+    text.className = "edge-text";
+    text.textContent = index < currentIndex ? card.body : card.headline;
+
+    inner.append(kicker, text);
+    target.appendChild(inner);
+  }
+
+  function setupResponsiveLayout(){
+    syncReelHeight();
+    if("ResizeObserver" in window){
+      const observer = new ResizeObserver(() => {
+        scheduleLayoutSync();
+      });
+      observer.observe(viewport);
+    }else{
+      window.addEventListener("resize", () => {
+        scheduleLayoutSync();
+      });
+    }
+  }
+
+  function scheduleLayoutSync(){
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      syncReelHeight();
+      fitCardsToViewport();
+      updateCardFocus();
+      updateEdgePreviews();
+      jumpToCurrentCard();
+    });
+  }
+
+  function syncReelHeight(){
+    viewport.style.setProperty("--reel-height", `${viewport.clientHeight}px`);
+  }
+
+  function fitCardsToViewport(){
+    Array.from(feed.children).forEach(card => {
+      card.style.setProperty("--fit", "1");
+      if(!cardOverflows(card)) return;
+
+      let low = 0.42;
+      let high = 1;
+      for(let i = 0; i < 12; i += 1){
+        const mid = (low + high) / 2;
+        card.style.setProperty("--fit", String(mid));
+        if(cardOverflows(card)){
+          high = mid;
+        }else{
+          low = mid;
+        }
+      }
+      card.style.setProperty("--fit", String(Math.max(0.42, low - 0.01)));
+    });
+  }
+
+  function cardOverflows(card){
+    return card.scrollHeight > card.clientHeight + 1 || card.scrollWidth > card.clientWidth + 1;
+  }
+
+  function restart(){
+    renderFeed();
+    startFeed();
+  }
+
+  function completeFeed(){
+    clearTimeout(timerId);
+    timerId = null;
+    progressBar.style.width = "100%";
+    viewport.classList.add("is-complete");
+    count.textContent = "Complete";
+    window.pscNewsfeedResult = buildResult();
+    sendEvent("newsreel_auto_complete");
+    document.dispatchEvent(new CustomEvent("psc-newsfeed-complete", {
+      detail: window.pscNewsfeedResult
+    }));
+  }
+
+  function buildResult(){
+    return {
+      event_family:"newsreel_auto",
+      participant_id:participantId,
+      study,
+      assignment,
+      condition,
+      card_order: FEEDS[condition].slice(),
+      dwell_ms: dwellMs,
+      transition_ms: transitionMs,
+      offscreen_ms: Math.round(offscreenMs),
+      exposure_log: exposureLog,
+      metadata:getClientMetadata()
+    };
+  }
+
+  function sendEvent(eventName){
+    if(!condition || !FEEDS[condition]) return;
+    const payload = {
+      event:eventName,
+      ...buildResult()
+    };
+    if(DEBUG_SAVE) console.info("[NEWSREEL][SAVE]", payload);
+    if(!SEND) return;
+    const body = JSON.stringify(payload);
+    const useBeacon = eventName.includes("unload") || document.hidden;
+    try{
+      const blob = new Blob([body], {type:"application/json"});
+      if(useBeacon && navigator.sendBeacon && navigator.sendBeacon(SAVE_URL, blob)) return;
+    }catch(e){
+      if(DEBUG_SAVE) console.warn("[NEWSREEL][SAVE] beacon failed", e);
+    }
+    fetch(SAVE_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body,
+      keepalive:useBeacon
+    }).catch(err => {
+      if(DEBUG_SAVE) console.error("[NEWSREEL][SAVE] fetch failed", err);
+    });
+  }
+
+  function logCurrentCard(){
+    const id = FEEDS[condition][currentIndex];
+    exposureLog.push({
+      card_id:id,
+      index:currentIndex + 1,
+      shown_ms:Math.max(0, Math.round(performance.now() - cardStartedAt))
+    });
+  }
+
+  function updateMeta(){
+    count.textContent = `Article ${currentIndex + 1} of ${FEEDS[condition].length}`;
+  }
+
+  function progressWidth(){
+    return `${Math.round((currentIndex / FEEDS[condition].length) * 100)}%`;
+  }
+
+  function setupFocusLogging(){
+    document.addEventListener("visibilitychange", () => {
+      if(document.hidden){
+        focusLostAt = performance.now();
+      }else if(focusLostAt !== null){
+        offscreenMs += performance.now() - focusLostAt;
+        focusLostAt = null;
+      }
+    });
+    window.addEventListener("blur", () => {
+      if(focusLostAt === null) focusLostAt = performance.now();
+    });
+    window.addEventListener("focus", () => {
+      if(focusLostAt !== null){
+        offscreenMs += performance.now() - focusLostAt;
+        focusLostAt = null;
+      }
+    });
+  }
+
+  window.addEventListener("pagehide", () => {
+    sendEvent("newsreel_auto_unload");
+  });
+
+  function getClientMetadata(){
+    return {
+      user_agent:navigator.userAgent,
+      viewport_width:window.innerWidth,
+      viewport_height:window.innerHeight,
+      screen_width:window.screen?.width ?? null,
+      screen_height:window.screen?.height ?? null,
+      device_pixel_ratio:window.devicePixelRatio ?? null,
+      language:navigator.language,
+      page_url:location.href
+    };
+  }
+
+  function normalizeFeedName(value){
+    if(!value) return "";
+    const raw = value.trim().toUpperCase().replaceAll("-", "_");
+    const aliases = {
+      POS:"POS_LOW_PSC",
+      POSITIVE:"POS_LOW_PSC",
+      NEG:"NEG_LOW_PSC",
+      NEGATIVE:"NEG_LOW_PSC",
+      MIXED_INCONGRUENT:"MIXED_INCONGRUENT_HIGH_PSC",
+      HIGH_PSC:"MIXED_INCONGRUENT_HIGH_PSC",
+      MIXED_CONGRUENT:"MIXED_CONGRUENT_LOW_PSC",
+      LOW_MIXED:"MIXED_CONGRUENT_LOW_PSC"
+    };
+    const name = aliases[raw] || raw;
+    return FEEDS[name] ? name : "";
+  }
+
+  function clampNumber(value, min, max){
+    return Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
+  }
+</script>
+</body>
+</html>
