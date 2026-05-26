@@ -314,7 +314,7 @@
     line-height:1.42;
   }
 
-  .card-id{
+  .source-tag{
     display:flex;
     align-items:center;
     gap:calc(9px * var(--fit));
@@ -325,7 +325,7 @@
     text-transform:uppercase;
   }
 
-  .card-id::before{
+  .source-tag::before{
     content:"";
     width:34px;
     height:2px;
@@ -429,7 +429,7 @@
     }
     .wire-label{margin-bottom:12px;font-size:11px}
     .headline{margin-bottom:12px}
-    .card-id{margin-top:16px}
+    .source-tag{margin-top:16px}
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -498,6 +498,17 @@
     NEG_LOW_PSC:["AI1N","AI2N","CL1N","CL2N","EC1N","EC2N","SF1N","SF2N"],
     MIXED_INCONGRUENT_HIGH_PSC:["AI2P","AI2N","CL1P","CL1N","EC1P","EC1N","SF2P","SF2N"],
     MIXED_CONGRUENT_LOW_PSC:["AI1P","AI2P","CL1N","CL2P","EC1N","EC2P","SF1N","SF2N"]
+  };
+
+  const SOURCE_DESCRIPTORS = {
+    "AI:1":"Forecast Wire / Health Systems",
+    "AI:2":"Forecast Wire / Education Systems",
+    "Climate:1":"Forecast Wire / Food and Land Systems",
+    "Climate:2":"Forecast Wire / Energy and Water",
+    "Economy:1":"Forecast Wire / Household Economy",
+    "Economy:2":"Forecast Wire / Labor Markets",
+    "Public Safety:1":"Forecast Wire / Urban Safety",
+    "Public Safety:2":"Forecast Wire / Security Systems"
   };
 
   const params = new URLSearchParams(location.search);
@@ -653,13 +664,17 @@
     body.className = "body";
     body.textContent = card.body;
 
-    const cardId = document.createElement("div");
-    cardId.className = "card-id";
-    cardId.textContent = card.card_id;
+    const sourceTag = document.createElement("div");
+    sourceTag.className = "source-tag";
+    sourceTag.textContent = sourceDescriptor(card);
 
-    story.append(label, headline, body, cardId);
+    story.append(label, headline, body, sourceTag);
     article.append(top, story);
     return article;
+  }
+
+  function sourceDescriptor(card){
+    return SOURCE_DESCRIPTORS[`${card.domain}:${card.subtopic}`] || `Forecast Wire / ${card.domain}`;
   }
 
   function startFeed(){
@@ -820,6 +835,13 @@
     document.dispatchEvent(new CustomEvent("psc-newsfeed-complete", {
       detail: window.pscNewsfeedResult
     }));
+    notifySurveyComplete();
+  }
+
+  function notifySurveyComplete(){
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage("experiment_complete", "*");
+    }
   }
 
   function buildResult(){
