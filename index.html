@@ -491,7 +491,7 @@
 <main class="shell" id="app">
   <div class="preview-panel" aria-label="Preview controls">
     <select id="feedSelect" aria-label="Feed condition"></select>
-    <input id="dwellInput" type="number" min="5" max="90" step="1" aria-label="Dwell seconds" />
+    <input id="dwellInput" type="number" min="5" max="90" step="0.1" aria-label="Dwell seconds" />
     <button id="restartButton" type="button">Restart</button>
   </div>
 
@@ -579,7 +579,7 @@
   const study = params.get("study") || "psc_newsreel_pretest";
   const preview = params.get("preview") === "1";
   const requestedFeed = normalizeFeedName(params.get("feed"));
-  let dwellMs = clampNumber(Number(params.get("dwell")) || 35000, 5000, 90000);
+  let dwellMs = clampNumber(Number(params.get("dwell")) || 28687.5, 5000, 90000);
   let transitionMs = clampNumber(Number(params.get("transition")) || 1500, 0, 5000);
   let condition = requestedFeed || "MIXED_INCONGRUENT_HIGH_PSC";
   let currentIndex = 0;
@@ -674,14 +674,14 @@
       feedSelect.appendChild(option);
     });
     feedSelect.value = condition;
-    dwellInput.value = String(Math.round(dwellMs / 1000));
+    dwellInput.value = String(Math.round((dwellMs / 1000) * 10) / 10);
     feedSelect.addEventListener("change", () => {
       condition = feedSelect.value;
       restart();
     });
     dwellInput.addEventListener("change", () => {
       dwellMs = clampNumber(Number(dwellInput.value) * 1000, 5000, 90000);
-      dwellInput.value = String(Math.round(dwellMs / 1000));
+      dwellInput.value = String(Math.round((dwellMs / 1000) * 10) / 10);
       restart();
     });
     restartButton.addEventListener("click", restart);
