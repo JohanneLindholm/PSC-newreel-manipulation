@@ -250,7 +250,7 @@
     align-items:center;
     justify-content:space-between;
     gap:calc(14px * var(--fit));
-    padding:4px 0;
+    padding:calc(24px * var(--fit)) 0;
     border-right:1px solid var(--line);
     font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
   }
@@ -368,6 +368,55 @@
   }
   .is-complete .done{display:grid}
 
+  .attention-warning{
+    position:absolute;
+    inset:0;
+    z-index:20;
+    display:none;
+    place-items:center;
+    padding:24px;
+    background:rgba(255,253,248,.94);
+  }
+
+  .attention-warning.is-visible{display:grid}
+
+  .attention-warning-box{
+    width:min(520px, 100%);
+    padding:24px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:#fffdfa;
+    box-shadow:0 18px 42px rgba(20,24,29,.16);
+    font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  .attention-warning-box h2{
+    margin:0 0 10px;
+    font-size:20px;
+    line-height:1.1;
+    letter-spacing:0;
+  }
+
+  .attention-warning-box p{
+    margin:0 0 18px;
+    color:#3f454b;
+    font-size:15px;
+    line-height:1.45;
+  }
+
+  .attention-warning-box button{
+    min-height:42px;
+    width:100%;
+    border:0;
+    border-radius:6px;
+    background:var(--ink);
+    color:white;
+    font:800 13px/1 system-ui,-apple-system,Segoe UI,Inter,Roboto,Helvetica,Arial,sans-serif;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+
   @media (max-width:640px){
     :root{--peek:50px;--card-gap:8px}
     body{font-size:17px}
@@ -469,6 +518,13 @@
       <div class="edge-preview top is-empty" id="topPreview" aria-hidden="true"></div>
       <div class="edge-preview bottom is-empty" id="bottomPreview" aria-hidden="true"></div>
       <div class="done" id="done">The newsfeed is complete.</div>
+      <div class="attention-warning" id="attentionWarning" role="dialog" aria-modal="true" aria-labelledby="attentionWarningTitle" aria-describedby="attentionWarningText">
+        <div class="attention-warning-box">
+          <h2 id="attentionWarningTitle">Please keep the newsreel visible</h2>
+          <p id="attentionWarningText">We noticed that the newsreel was no longer visible. We can only use the data if the full newsreel is viewed. If you still want to continue, we will restart the newsreel from the beginning.</p>
+          <button type="button" id="attentionRestartButton">Restart newsreel</button>
+        </div>
+      </div>
     </section>
   </section>
 </main>
@@ -501,20 +557,21 @@
   };
 
   const SOURCE_DESCRIPTORS = {
-    "AI:1":"Forecast Wire / Health Systems",
-    "AI:2":"Forecast Wire / Education Systems",
-    "Climate:1":"Forecast Wire / Food and Land Systems",
-    "Climate:2":"Forecast Wire / Energy and Water",
-    "Economy:1":"Forecast Wire / Household Economy",
-    "Economy:2":"Forecast Wire / Labor Markets",
-    "Public Safety:1":"Forecast Wire / Urban Safety",
-    "Public Safety:2":"Forecast Wire / Security Systems"
+    "AI:1":"Health Systems",
+    "AI:2":"Education Systems",
+    "Climate:1":"Food and Land Systems",
+    "Climate:2":"Energy and Water",
+    "Economy:1":"Household Economy",
+    "Economy:2":"Labor Markets",
+    "Public Safety:1":"Urban Safety",
+    "Public Safety:2":"Security Systems"
   };
 
   const params = new URLSearchParams(location.search);
   const ASSIGN_URL = params.get("assign_url") || "https://DecisionLab.eu.pythonanywhere.com/assign-newsreel-condition";
   const SAVE_URL = params.get("save_url") || "https://DecisionLab.eu.pythonanywhere.com/save-EFT";
   const NEWSREEL_VERSION = "auto_ecological_v1.1";
+  const VISIBILITY_WARNING_GRACE_MS = 1500;
   const SEND = params.get("send") !== "0";
   const DEBUG_SAVE = params.get("debug") === "1";
   const participantId = params.get("participant_id") || params.get("PROLIFIC_PID") || params.get("ResponseID") || `guest_${Date.now()}`;
@@ -531,11 +588,13 @@
   let cardStartedAt = 0;
   let exposureLog = [];
   let visibilityLog = [];
-  let focusLostAt = null;
+  let visibilityHiddenStartedAt = null;
   let offscreenMs = 0;
   let resizeFrame = null;
   let assignment = null;
   let completed = false;
+  let attentionWarningShown = false;
+  let attentionWarningActive = false;
 
   const app = document.getElementById("app");
   const viewport = document.getElementById("viewport");
@@ -548,10 +607,13 @@
   const feedSelect = document.getElementById("feedSelect");
   const dwellInput = document.getElementById("dwellInput");
   const restartButton = document.getElementById("restartButton");
+  const attentionWarning = document.getElementById("attentionWarning");
+  const attentionRestartButton = document.getElementById("attentionRestartButton");
 
   if(preview) app.classList.add("preview");
   setupResponsiveLayout();
   setupFocusLogging();
+  setupAttentionWarning();
   initialize();
 
   async function initialize(){
@@ -674,7 +736,7 @@
   }
 
   function sourceDescriptor(card){
-    return SOURCE_DESCRIPTORS[`${card.domain}:${card.subtopic}`] || `Forecast Wire / ${card.domain}`;
+    return SOURCE_DESCRIPTORS[`${card.domain}:${card.subtopic}`] || card.domain;
   }
 
   function startFeed(){
@@ -684,8 +746,10 @@
     visibilityLog = [];
     offscreenMs = 0;
     completed = false;
-    focusLostAt = document.hidden ? performance.now() : null;
-    if(focusLostAt !== null){
+    attentionWarningActive = false;
+    attentionWarning.classList.remove("is-visible");
+    visibilityHiddenStartedAt = document.hidden ? performance.now() : null;
+    if(visibilityHiddenStartedAt !== null){
       visibilityLog.push({event:"hidden_at_start", t_ms:0});
     }
     syncReelHeight();
@@ -700,6 +764,19 @@
     timerId = setTimeout(advance, dwellMs);
     requestAnimationFrame(() => { progressBar.style.width = progressWidth(); });
     sendEvent("newsreel_auto_start");
+  }
+
+  function setupAttentionWarning(){
+    attentionRestartButton.addEventListener("click", () => {
+      attentionWarningActive = false;
+      attentionWarning.classList.remove("is-visible");
+      visibilityLog.push({
+        event:"attention_restart",
+        t_ms:Math.round(performance.now() - feedStartedAt)
+      });
+      sendEvent("newsreel_auto_attention_restart");
+      restart();
+    });
   }
 
   function advance(){
@@ -860,6 +937,7 @@
       delivered_card_count:exposureLog.length,
       completed,
       completion_flag:completed && exposureLog.length === FEEDS[condition].length,
+      attention_warning_shown:attentionWarningShown,
       total_feed_ms:Math.round(performance.now() - feedStartedAt),
       offscreen_ms: Math.round(currentOffscreenMs()),
       exposure_log: exposureLog,
@@ -918,37 +996,51 @@
   function setupFocusLogging(){
     document.addEventListener("visibilitychange", () => {
       if(document.hidden){
-        focusLostAt = performance.now();
-        visibilityLog.push({event:"hidden", t_ms:Math.round(focusLostAt - feedStartedAt)});
-      }else if(focusLostAt !== null){
+        visibilityHiddenStartedAt = performance.now();
+        clearTimeout(timerId);
+        visibilityLog.push({event:"hidden", t_ms:Math.round(visibilityHiddenStartedAt - feedStartedAt)});
+      }else if(visibilityHiddenStartedAt !== null){
         const now = performance.now();
-        offscreenMs += now - focusLostAt;
+        const hiddenMs = now - visibilityHiddenStartedAt;
+        offscreenMs += hiddenMs;
         visibilityLog.push({
           event:"visible",
           t_ms:Math.round(now - feedStartedAt),
-          hidden_ms:Math.round(now - focusLostAt)
+          hidden_ms:Math.round(hiddenMs)
         });
-        focusLostAt = null;
+        visibilityHiddenStartedAt = null;
+        if(hiddenMs >= VISIBILITY_WARNING_GRACE_MS && !attentionWarningShown && !completed){
+          showAttentionWarning(hiddenMs);
+        }else if(!completed){
+          resumeCurrentCard();
+        }
       }
     });
     window.addEventListener("blur", () => {
-      if(focusLostAt === null){
-        focusLostAt = performance.now();
-        visibilityLog.push({event:"blur", t_ms:Math.round(focusLostAt - feedStartedAt)});
-      }
+      visibilityLog.push({event:"blur", t_ms:Math.round(performance.now() - feedStartedAt)});
     });
     window.addEventListener("focus", () => {
-      if(focusLostAt !== null){
-        const now = performance.now();
-        offscreenMs += now - focusLostAt;
-        visibilityLog.push({
-          event:"focus",
-          t_ms:Math.round(now - feedStartedAt),
-          hidden_ms:Math.round(now - focusLostAt)
-        });
-        focusLostAt = null;
-      }
+      visibilityLog.push({event:"focus", t_ms:Math.round(performance.now() - feedStartedAt)});
     });
+  }
+
+  function showAttentionWarning(hiddenMs){
+    attentionWarningShown = true;
+    attentionWarningActive = true;
+    visibilityLog.push({
+      event:"attention_warning",
+      t_ms:Math.round(performance.now() - feedStartedAt),
+      hidden_ms:Math.round(hiddenMs)
+    });
+    attentionWarning.classList.add("is-visible");
+    sendEvent("newsreel_auto_attention_warning");
+  }
+
+  function resumeCurrentCard(){
+    if(attentionWarningActive || timerId || completed) return;
+    const elapsedOnCard = Math.max(0, performance.now() - cardStartedAt);
+    const remaining = clampNumber(dwellMs - elapsedOnCard, 1000, dwellMs);
+    timerId = setTimeout(advance, remaining);
   }
 
   window.addEventListener("pagehide", () => {
@@ -957,8 +1049,8 @@
   });
 
   function currentOffscreenMs(){
-    if(focusLostAt !== null){
-      return offscreenMs + Math.max(0, performance.now() - focusLostAt);
+    if(visibilityHiddenStartedAt !== null){
+      return offscreenMs + Math.max(0, performance.now() - visibilityHiddenStartedAt);
     }
     return offscreenMs;
   }
