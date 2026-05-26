@@ -503,9 +503,11 @@
   const params = new URLSearchParams(location.search);
   const ASSIGN_URL = params.get("assign_url") || "https://DecisionLab.eu.pythonanywhere.com/assign-newsreel-condition";
   const SAVE_URL = params.get("save_url") || "https://DecisionLab.eu.pythonanywhere.com/save-EFT";
+  const NEWSREEL_VERSION = "auto_ecological_v1.1";
   const SEND = params.get("send") !== "0";
   const DEBUG_SAVE = params.get("debug") === "1";
   const participantId = params.get("participant_id") || params.get("PROLIFIC_PID") || params.get("ResponseID") || `guest_${Date.now()}`;
+  const sessionId = params.get("session_id") || cryptoRandomId();
   const study = params.get("study") || "psc_newsreel_pretest";
   const preview = params.get("preview") === "1";
   const requestedFeed = normalizeFeedName(params.get("feed"));
@@ -514,12 +516,15 @@
   let condition = requestedFeed || "MIXED_INCONGRUENT_HIGH_PSC";
   let currentIndex = 0;
   let timerId = null;
+  let feedStartedAt = 0;
   let cardStartedAt = 0;
   let exposureLog = [];
+  let visibilityLog = [];
   let focusLostAt = null;
   let offscreenMs = 0;
   let resizeFrame = null;
   let assignment = null;
+  let completed = false;
 
   const app = document.getElementById("app");
   const viewport = document.getElementById("viewport");
@@ -661,15 +666,21 @@
     clearTimeout(timerId);
     currentIndex = 0;
     exposureLog = [];
+    visibilityLog = [];
     offscreenMs = 0;
+    completed = false;
     focusLostAt = document.hidden ? performance.now() : null;
+    if(focusLostAt !== null){
+      visibilityLog.push({event:"hidden_at_start", t_ms:0});
+    }
     syncReelHeight();
     fitCardsToViewport();
     updateCardFocus();
     updateEdgePreviews();
     jumpToCurrentCard();
     updateMeta();
-    cardStartedAt = performance.now();
+    feedStartedAt = performance.now();
+    cardStartedAt = feedStartedAt;
     progressBar.style.width = "0%";
     timerId = setTimeout(advance, dwellMs);
     requestAnimationFrame(() => { progressBar.style.width = progressWidth(); });
@@ -800,6 +811,7 @@
   function completeFeed(){
     clearTimeout(timerId);
     timerId = null;
+    completed = true;
     progressBar.style.width = "100%";
     viewport.classList.add("is-complete");
     count.textContent = "Complete";
@@ -813,15 +825,23 @@
   function buildResult(){
     return {
       event_family:"newsreel_auto",
+      feed_version:NEWSREEL_VERSION,
       participant_id:participantId,
+      session_id:sessionId,
       study,
       assignment,
       condition,
       card_order: FEEDS[condition].slice(),
       dwell_ms: dwellMs,
       transition_ms: transitionMs,
-      offscreen_ms: Math.round(offscreenMs),
+      intended_card_count:FEEDS[condition].length,
+      delivered_card_count:exposureLog.length,
+      completed,
+      completion_flag:completed && exposureLog.length === FEEDS[condition].length,
+      total_feed_ms:Math.round(performance.now() - feedStartedAt),
+      offscreen_ms: Math.round(currentOffscreenMs()),
       exposure_log: exposureLog,
+      visibility_log: visibilityLog,
       metadata:getClientMetadata()
     };
   }
@@ -854,10 +874,14 @@
 
   function logCurrentCard(){
     const id = FEEDS[condition][currentIndex];
+    const now = performance.now();
     exposureLog.push({
       card_id:id,
       index:currentIndex + 1,
-      shown_ms:Math.max(0, Math.round(performance.now() - cardStartedAt))
+      started_ms:Math.max(0, Math.round(cardStartedAt - feedStartedAt)),
+      ended_ms:Math.max(0, Math.round(now - feedStartedAt)),
+      shown_ms:Math.max(0, Math.round(now - cardStartedAt)),
+      intended_dwell_ms:dwellMs
     });
   }
 
@@ -873,25 +897,49 @@
     document.addEventListener("visibilitychange", () => {
       if(document.hidden){
         focusLostAt = performance.now();
+        visibilityLog.push({event:"hidden", t_ms:Math.round(focusLostAt - feedStartedAt)});
       }else if(focusLostAt !== null){
-        offscreenMs += performance.now() - focusLostAt;
+        const now = performance.now();
+        offscreenMs += now - focusLostAt;
+        visibilityLog.push({
+          event:"visible",
+          t_ms:Math.round(now - feedStartedAt),
+          hidden_ms:Math.round(now - focusLostAt)
+        });
         focusLostAt = null;
       }
     });
     window.addEventListener("blur", () => {
-      if(focusLostAt === null) focusLostAt = performance.now();
+      if(focusLostAt === null){
+        focusLostAt = performance.now();
+        visibilityLog.push({event:"blur", t_ms:Math.round(focusLostAt - feedStartedAt)});
+      }
     });
     window.addEventListener("focus", () => {
       if(focusLostAt !== null){
-        offscreenMs += performance.now() - focusLostAt;
+        const now = performance.now();
+        offscreenMs += now - focusLostAt;
+        visibilityLog.push({
+          event:"focus",
+          t_ms:Math.round(now - feedStartedAt),
+          hidden_ms:Math.round(now - focusLostAt)
+        });
         focusLostAt = null;
       }
     });
   }
 
   window.addEventListener("pagehide", () => {
+    visibilityLog.push({event:"pagehide", t_ms:Math.round(performance.now() - feedStartedAt)});
     sendEvent("newsreel_auto_unload");
   });
+
+  function currentOffscreenMs(){
+    if(focusLostAt !== null){
+      return offscreenMs + Math.max(0, performance.now() - focusLostAt);
+    }
+    return offscreenMs;
+  }
 
   function getClientMetadata(){
     return {
@@ -904,6 +952,11 @@
       language:navigator.language,
       page_url:location.href
     };
+  }
+
+  function cryptoRandomId(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return `session_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   }
 
   function normalizeFeedName(value){
