@@ -584,7 +584,7 @@
   const study = params.get("study") || "psc_newsreel_mixed_pretest";
   const preview = params.get("preview") === "1";
   const requestedFeed = normalizeFeedName(params.get("feed"));
-  let dwellMs = clampNumber(Number(params.get("dwell")) || 24000, 5000, 90000);
+  let dwellMs = clampNumber(Number(params.get("dwell")) || 21625, 5000, 90000);
   let transitionMs = clampNumber(Number(params.get("transition")) || 1000, 0, 5000);
   let condition = requestedFeed || "MIXED_INCONGRUENT_HIGH_PSC";
   let currentIndex = 0;
