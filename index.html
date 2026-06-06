@@ -556,10 +556,8 @@
   };
 
   const FEEDS = {
-    POS_LOW_PSC:["AI1P","AI2P","CL1P","CL2P","EC1P","EC2P","SF1P","SF2P"],
-    NEG_LOW_PSC:["AI1N","AI2N","CL1N","CL2N","EC1N","EC2N","SF1N","SF2N"],
     MIXED_INCONGRUENT_HIGH_PSC:["AI2P","AI2N","CL1P","CL1N","EC1P","EC1N","SF2P","SF2N"],
-    MIXED_CONGRUENT_LOW_PSC:["AI1P","AI2P","CL1N","CL2P","EC1N","EC2P","SF1N","SF2N"]
+    MIXED_CONGRUENT_LOW_PSC:["AI1P","AI2P","CL1P","CL2P","EC1N","EC2N","SF1N","SF2N"]
   };
 
   const SOURCE_DESCRIPTORS = {
@@ -576,13 +574,13 @@
   const params = new URLSearchParams(location.search);
   const ASSIGN_URL = params.get("assign_url") || "https://DecisionLab.eu.pythonanywhere.com/assign-newsreel-condition";
   const SAVE_URL = params.get("save_url") || "https://DecisionLab.eu.pythonanywhere.com/save-EFT";
-  const NEWSREEL_VERSION = "auto_ecological_v1.1";
+  const NEWSREEL_VERSION = "auto_ecological_mixed_only_v1.1";
   const VISIBILITY_WARNING_GRACE_MS = 1500;
   const SEND = params.get("send") !== "0";
   const DEBUG_SAVE = params.get("debug") === "1";
   const participantId = params.get("participant_id") || params.get("PROLIFIC_PID") || params.get("ResponseID") || `guest_${Date.now()}`;
   const sessionId = params.get("session_id") || cryptoRandomId();
-  const study = params.get("study") || "psc_newsreel_pretest";
+  const study = params.get("study") || "psc_newsreel_mixed_pretest";
   const preview = params.get("preview") === "1";
   const requestedFeed = normalizeFeedName(params.get("feed"));
   let dwellMs = clampNumber(Number(params.get("dwell")) || 28687.5, 5000, 90000);
@@ -651,6 +649,7 @@
         body:JSON.stringify({
           participant_id:participantId,
           study,
+          condition_pool:Object.keys(FEEDS),
           page_url:location.href,
           user_agent:navigator.userAgent,
           viewport_width:window.innerWidth,
@@ -1083,10 +1082,6 @@
     if(!value) return "";
     const raw = value.trim().toUpperCase().replaceAll("-", "_");
     const aliases = {
-      POS:"POS_LOW_PSC",
-      POSITIVE:"POS_LOW_PSC",
-      NEG:"NEG_LOW_PSC",
-      NEGATIVE:"NEG_LOW_PSC",
       MIXED_INCONGRUENT:"MIXED_INCONGRUENT_HIGH_PSC",
       HIGH_PSC:"MIXED_INCONGRUENT_HIGH_PSC",
       MIXED_CONGRUENT:"MIXED_CONGRUENT_LOW_PSC",
